@@ -1,0 +1,69 @@
+@startuml
+[mobile-app] #3399ff
+[identity-management-service] #F7a7f5
+
+package [kyc] {
+    database "kyc-db"
+    [kyc-service] #Aae283
+}
+cloud {
+    [incode] #ccccff
+}
+
+cloud {
+    [aws-s3-bucket] #F5c550
+}
+
+skinparam queue<<shared>> {
+    BackgroundColor #B1b1ac
+}
+queue "MessageQueue"<<shared>> {
+    [                                                                                                                  kafka                                                                                                                  ] as kafka #B1b1ac
+}
+
+
+[mobile-app] -[#3399ff]> [identity-management-service] : request token\nhttp\n80
+[identity-management-service] -[#ff3399]down-> [kyc-service] : init verification states\nhttp\n80
+'[kyc-service] <-[#ff3399]up- [identity-management-service] : init verification states\nhttp\n80
+[identity-management-service] -[#ff3399]--> [incode] : api queries/onboarding\nhttp\n443
+[incode] -[#ccccff]--> [identity-management-service] : webhook\nhttp\n443
+[identity-management-service] -[#ff3399]up-> [aws-s3-bucket] : uploads documents\nhttp\n443
+[identity-management-service] -[#ff3399]--> kafka : publishes VerifyIdentificationResult\n9092
+[kyc-service] <--[#B1b1ac]- kafka : consumes VerifyIdentificationResult\n9092
+[kyc-service] <-[#Aae283]> [kyc-db]
+[mobile-app] -[#3399ff]--> [incode] : SDK communication\nhttp\n443
+
+/'
+package "Some Group" {
+  HTTP - [First Component]
+  [Another Component]
+}
+
+node "Other Groups" {
+  FTP - [Second Component]
+  [First Component] --> FTP
+}
+
+cloud {
+  [Example 1]
+}
+
+
+database "MySql" {
+  folder "This is my folder" {
+    [Folder 3]
+  }
+  frame "Foo" {
+    [Frame 4]
+  }
+}
+`/
+
+
+
+[Another Component] --> [Example 1]
+[Example 1] --> [Folder 3]
+[Folder 3] --> [Frame 4]
+[Component] --> [Frame 4]
+
+@enduml

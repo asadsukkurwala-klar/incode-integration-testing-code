@@ -1,0 +1,4 @@
+#Tue Aug 16 18:25:07 PKT 2022
+base.0=/Users/muhammadasadsukkurwala/workspace/my_app/android/build/app/intermediates/dex/release/minifyReleaseWithR8/classes.dex
+renamed.0=classes.dex
+path.0=classes.dex

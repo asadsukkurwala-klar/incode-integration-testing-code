@@ -1,0 +1,31 @@
+@startuml
+
+(*) -->[ starts onboarding] "Mobile App"
+note right: "check"
+    "Mobile App" --> "GW: request verification token"
+    "GW: request verification token" --> "KYC: forward request verification token"
+    "KYC: forward request verification token" -->[saves verification state] "KYC: forward request verification token"
+    "KYC: forward request verification token" --> "IncodeBridge: forward request verification token"
+    "IncodeBridge: forward request verification token" -->[/omni/start] "Incode: start a new session and return token"
+    note right: "response is returned to Mobile App\nvia\nIncode>IncodeBridge>KYC>GW>MobileApp"
+    "Incode: start a new session and return token" --> "Mobile App: User follows verification steps"
+    "Mobile App: User follows verification steps" --> "IncodeBridge: Incode calls webhook after onboarding is complete"
+    "IncodeBridge: Incode calls webhook after onboarding is complete" --> "IncodeBridge: fetches scores for verification from Incode"
+    note right: Fetch new token or use a token saved previously?\nWe can use any token with any request and I would prefer to include id in request explicitly,\ninstead of relying on information embedded within the token.\nThis means we can keep a token on backend solely for backend requests
+    if "score == acceptable" then
+    note left: What is an acceptable score?
+        -->[yes] "IncodeBridge: fetch OCR data and images"
+        note right: implement retry mechanism
+    else
+        ->[no] "WHAT TO DO? RESTART PROCESS?"
+    endif
+    "IncodeBridge: fetch OCR data and images" --> "IncodeBridge: match OCR data against database"
+    if "OCR data matches?" then
+        -->[yes] "IncodeBridge: store images on S3"
+    else
+        ->[no] "GENERATE VerificationResults Event with some kind of VERIFICATION_FAILED data?"
+    endif
+    "IncodeBridge: store images on S3" --> "IncodeBridge: Generate VerificationResults event with VERIFIED?"
+    "IncodeBridge: Generate VerificationResults event with VERIFIED?" --> "KYC: handle Kafka event"
+
+@enduml
