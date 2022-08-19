@@ -59,7 +59,7 @@ class _MyHomePageState extends State<MyHomePage> {
   late String getIncodeConfigUrl = '$backendBaseUrl/incode/config';
   late String getVerificationStatusesUrl = '$backendBaseUrl/verification/status';
   late String postWebhookUrl = '$backendBaseUrl/incode/webhook';
-  String userId = "";
+  late String userId = "mas";
   String SEPARATOR = ":";
   var DO_VERIFICATION_STATUSES = ["NEEDED", "TO_BE_RETRIED"];
 
@@ -107,7 +107,7 @@ class _MyHomePageState extends State<MyHomePage> {
       loggingEnabled: true,
       onSuccess: () {
         print('Incode initialize successfully!');
-        _startOnboardingV1(sessions);
+        _startOnboardingV2(sessions);
       },
       onError: (String error) {
         print('Incode SDK init failed: $error');
@@ -129,10 +129,16 @@ class _MyHomePageState extends State<MyHomePage> {
     String externalId = incodeStartSingleVerificationConfig["externalId"];
 
     // hardcoding flow/configurationId for now because it doesn't matter
+    String verificationType = externalId.substring(0, externalId.indexOf(SEPARATOR));
+    List<OnboardingValidationModule> onboardingValidationModules = _createOnboardingValidationModulesList(verificationType);
     String configurationId = "629540c0362696001836915b";
     OnboardingSessionConfiguration sessionConfiguration =
-        OnboardingSessionConfiguration(configurationId: configurationId, externalId: externalId, token: token);
-    String verificationType = externalId.substring(0, externalId.indexOf(SEPARATOR));
+        OnboardingSessionConfiguration(configurationId: configurationId,
+            externalId: externalId,
+            interviewId: interviewId,
+            token: token,
+            userRegion: "ALL",
+            onboardingValidationModules: onboardingValidationModules);
     IncodeOnboardingSdk.setupOnboardingSession(sessionConfig: sessionConfiguration,
         onSuccess: (result) => {
           // simulating a webhook callback
@@ -188,6 +194,16 @@ class _MyHomePageState extends State<MyHomePage> {
     OnboardingFlowConfiguration flowConfiguration = OnboardingFlowConfiguration();
     verificationTypeFlowConfigurer[verificationType]!.call(flowConfiguration);
     return flowConfiguration;
+  }
+
+  Map<String, List<OnboardingValidationModule>> verificationTypeOnboardingListModulesMap = {
+    "PHOTO_ID": [OnboardingValidationModule.id],
+    "GOVT_VALIDATION": [OnboardingValidationModule.governmentValidation],
+    "LIVENESS": [OnboardingValidationModule.liveness]
+  };
+
+  List<OnboardingValidationModule> _createOnboardingValidationModulesList(String verificationType) {
+    return verificationTypeOnboardingListModulesMap[verificationType]!;
   }
 
   @override
@@ -272,6 +288,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   border: InputBorder.none,
                   labelText: 'userId',
                   hintText: 'userId'),
+              controller: TextEditingController()..text = this.userId,
               onChanged: (val) => {this.userId = val},
             ),
             TextField(

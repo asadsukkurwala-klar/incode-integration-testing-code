@@ -71,7 +71,8 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
     implementation 'com.android.support:multidex:1.0.3' // has to be done in the client app
     implementation 'com.incode.sdk:core-light:2.2.0' // Required core dependency
-    implementation 'com.incode.sdk:welcome:5.4.0' // Incode Welcome SDK
+    implementation 'com.incode.sdk:welcome:5.3.0' // Incode Welcome SDK
+    implementation 'com.incode.sdk:extensions:1.0.0' // Incode Extensions
     implementation 'com.incode.sdk:model-mask-detection:2.0.0' // Optional dependency
     implementation 'com.incode.sdk:model-liveness-detection:2.0.0' // Optional dependency
     implementation 'com.incode.sdk:model-face-recognition:2.0.0' // Optional dependency
