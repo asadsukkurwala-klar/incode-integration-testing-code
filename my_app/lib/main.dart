@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -51,86 +52,120 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  String getIncodeConfigUrl = 'http://localhost:8081/kyc/incode/config?externalId=';
-  String externalId = "";
-  int _counter = 0;
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
+
+class _MyHomePageState extends State<MyHomePage> {
+  String backendBaseUrl = 'http://192.168.1.216:8081/kyc';
+  late String getIncodeConfigUrl = '$backendBaseUrl/incode/config';
+  late String getVerificationStatusesUrl = '$backendBaseUrl/verification/status';
+  late String postWebhookUrl = '$backendBaseUrl/incode/webhook';
+  String userId = "";
+  String SEPARATOR = ":";
+  var DO_VERIFICATION_STATUSES = ["NEEDED", "TO_BE_RETRIED"];
 
   Future<Map<String, dynamic>> getIncodeConfig(String url) async {
     return await http.get(Uri.parse(url))
         .then((response) => jsonDecode(response.body));
   }
 
+  Future<Map<String, dynamic>> getVerifications(String url, String userId) async {
+    return await http.get(Uri.parse(url + '?userId=$userId'))
+        .then((response) => jsonDecode(response.body));
+  }
+
+  void _postWebhook(String interviewId, String externalId) async {
+    Map<String, dynamic> body = {
+      "onboardingStatus": "ONBOARDING_FINISHED",
+      "interviewId": interviewId,
+      "externalId": externalId
+    };
+    await http.post(Uri.parse('$backendBaseUrl/incode/webhook'), body: jsonEncode(body))
+        .then((response) => jsonDecode(response.body));
+  }
+
   void _initSdk() async {
-    Map<String, dynamic> incodeConfigMap = await getIncodeConfig(this.getIncodeConfigUrl + this.externalId);
+    Map<String, dynamic> verificationStatuses = await getVerifications(this.getVerificationStatusesUrl, this.userId);
+    // filter out verifications that have been completed
+    Map<String, dynamic> verificationStatusesToBeDone =
+        Map.from(verificationStatuses)..removeWhere((key, value) => !DO_VERIFICATION_STATUSES.contains(value.toString()));
+    String verificationTypesQueryString = _createVerificationTypesQueryString(verificationStatusesToBeDone);
+    Map<String, dynamic> incodeConfigMap =
+        await getIncodeConfig(this.getIncodeConfigUrl + "?"
+            + 'userId=${this.userId}'
+            + '&$verificationTypesQueryString');
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(incodeConfigMap.toString()),
     ));
     String apiKey = incodeConfigMap["apiKey"];
-    String token = incodeConfigMap["token"];
-    String interviewId = incodeConfigMap["interviewId"];
-    String flowConfigId = incodeConfigMap["flowConfigId"];
     String incodeApiUrl = incodeConfigMap["incodeApiUrl"];
+    Map<String, dynamic> sessions = incodeConfigMap["incodeStartSingleVerificationConfigMap"];
+
     IncodeOnboardingSdk.init(
       apiKey: apiKey,
       apiUrl: incodeApiUrl,
       testMode: false,
       loggingEnabled: true,
       onSuccess: () {
-        // Update UI, safe to start Onboarding
         print('Incode initialize successfully!');
-        _startOnboarding(token, interviewId, this.externalId, flowConfigId);
-        /*
-      setState(() {
-        initSuccess = true;
-      });
-      */
+        _startOnboarding(sessions);
       },
       onError: (String error) {
         print('Incode SDK init failed: $error');
-        /*
-          setState(() {
-            initSuccess = false;
-          });
-          */
         showAlertDialog(context, '$error');
       },
     );
   }
 
-  void _startOnboarding(String token, String interviewId, String externalId, String flowConfigId) {
-    OnboardingSessionConfiguration sessionConfiguration = OnboardingSessionConfiguration(configurationId: flowConfigId, externalId: externalId);
-    OnboardingFlowConfiguration flowConfiguration = OnboardingFlowConfiguration();
-    flowConfiguration.addIdScan();
+  String _createVerificationTypesQueryString(Map<String, dynamic> verificationStatuses) {
+    String queryString = "";
+    verificationStatuses.forEach((key, value) {queryString += '&verificationTypes=$key';});
+    return queryString.substring(1);
+  }
+
+  void _startOnboarding(Map<String, dynamic> sessions) {
+    dynamic incodeStartSingleVerificationConfig = sessions.remove(sessions.keys.first);
+    String interviewId = incodeStartSingleVerificationConfig["interviewId"];
+    String token = incodeStartSingleVerificationConfig["token"];
+    String externalId = incodeStartSingleVerificationConfig["externalId"];
+
+    // hardcoding flow/configurationId for now because it doesn't matter
+    OnboardingSessionConfiguration sessionConfiguration =
+        OnboardingSessionConfiguration(configurationId: "629540c0362696001836915b", externalId: externalId);
+    String verificationType = externalId.substring(0, externalId.indexOf(SEPARATOR));
+    OnboardingFlowConfiguration flowConfiguration = _createOnboardingFlowConfiguration(verificationType);
+
     IncodeOnboardingSdk.startOnboarding(
         sessionConfig: sessionConfiguration,
         flowConfig: flowConfiguration,
-        onSuccess: () => { showAlertDialog(context, "Onboarding Completed Successfully") },
-        onError: (error) => { showAlertDialog(context, 'Onboarding Error: $error') }
+        onSuccess: () => {
+          // simulating a webhook callback
+          _postWebhook(interviewId, externalId),
+          // start a new verification until all verifications are done
+              if (sessions.isEmpty)
+                {showAlertDialog(context, "Onboarding Completed Successfully")}
+              else
+                {_startOnboarding(sessions)}
+            },
+        onError: (error) => {showAlertDialog(context, 'Onboarding Error: $error')}
     );
+  }
+
+  // add more if needed
+  Map<String, void Function(OnboardingFlowConfiguration flowConfiguration)> verificationTypeFlowConfigurer = {
+    "PHOTO_ID": (flowConfiguration) => {flowConfiguration.addIdScan()},
+    "GOVT_VALIDATION": (flowConfiguration) => {flowConfiguration.addGovernmentValidation()},
+    "LIVENESS": (flowConfiguration) => {flowConfiguration.addSelfieScan()}
+  };
+
+  OnboardingFlowConfiguration _createOnboardingFlowConfiguration(String verificationType) {
+    OnboardingFlowConfiguration flowConfiguration = OnboardingFlowConfiguration();
+    verificationTypeFlowConfigurer[verificationType]!.call(flowConfiguration);
+    return flowConfiguration;
   }
 
   @override
   void initState() {
     super.initState();
-    //showAlertDialog(context, "test");
-    try {
-      //throw Exception("test");
-    } on Exception catch(_) {
-      showAlertDialog(context, "test");
-      fetchAlbum().then((value) => null);
-    }
   }
 
   Future<http.Response> fetchAlbum() {
@@ -166,8 +201,6 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
     //
     // The Flutter framework has been optimized to make rerunning build methods
     // fast, so that you can just rebuild anything that needs updating rather
@@ -198,13 +231,6 @@ class _MyHomePageState extends State<MyHomePage> {
           // horizontal).
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
-            ),
             TextField(
               decoration: InputDecoration(
                   border: InputBorder.none,
@@ -217,9 +243,18 @@ class _MyHomePageState extends State<MyHomePage> {
             TextField(
               decoration: InputDecoration(
                   border: InputBorder.none,
-                  labelText: 'startOnboarding externalId',
-                  hintText: 'flowId:userId ???'),
-              onChanged: (val) => {this.externalId = val},
+                  labelText: 'userId',
+                  hintText: 'userId'),
+              onChanged: (val) => {this.userId = val},
+            ),
+            TextField(
+              decoration: InputDecoration(
+                  border: InputBorder.none,
+                  labelText: 'get verification statuses url',
+                  hintText: this.getVerificationStatusesUrl),
+              controller: TextEditingController()..text = this.getVerificationStatusesUrl,
+              onChanged: (val) => {this.getVerificationStatusesUrl = val},
+              //fetchAlbum().then((value) => null);
             ),
             /*
             const TextField(
