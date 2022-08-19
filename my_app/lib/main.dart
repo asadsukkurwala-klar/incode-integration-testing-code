@@ -107,7 +107,7 @@ class _MyHomePageState extends State<MyHomePage> {
       loggingEnabled: true,
       onSuccess: () {
         print('Incode initialize successfully!');
-        _startOnboarding(sessions);
+        _startOnboardingV1(sessions);
       },
       onError: (String error) {
         print('Incode SDK init failed: $error');
@@ -122,15 +122,42 @@ class _MyHomePageState extends State<MyHomePage> {
     return queryString.substring(1);
   }
 
-  void _startOnboarding(Map<String, dynamic> sessions) {
+  void _startOnboardingV2(Map<String, dynamic> sessions) {
     dynamic incodeStartSingleVerificationConfig = sessions.remove(sessions.keys.first);
     String interviewId = incodeStartSingleVerificationConfig["interviewId"];
     String token = incodeStartSingleVerificationConfig["token"];
     String externalId = incodeStartSingleVerificationConfig["externalId"];
 
     // hardcoding flow/configurationId for now because it doesn't matter
+    String configurationId = "629540c0362696001836915b";
     OnboardingSessionConfiguration sessionConfiguration =
-        OnboardingSessionConfiguration(configurationId: "629540c0362696001836915b", externalId: externalId);
+        OnboardingSessionConfiguration(configurationId: configurationId, externalId: externalId, token: token);
+    String verificationType = externalId.substring(0, externalId.indexOf(SEPARATOR));
+    IncodeOnboardingSdk.setupOnboardingSession(sessionConfig: sessionConfiguration,
+        onSuccess: (result) => {
+          // simulating a webhook callback
+          _postWebhook(interviewId, externalId),
+          // start a new verification until all verifications are done
+          if (sessions.isEmpty)
+            {showAlertDialog(context, "Onboarding Completed Successfully")}
+          else
+            {_startOnboardingV2(sessions)}
+        },
+        onError: (error) => {showAlertDialog(context, 'Onboarding Error: $error')});
+  }
+
+  // was implemented in SDK v1
+  void _startOnboardingV1(Map<String, dynamic> sessions) {
+    dynamic incodeStartSingleVerificationConfig = sessions.remove(sessions.keys.first);
+    String interviewId = incodeStartSingleVerificationConfig["interviewId"];
+    String token = incodeStartSingleVerificationConfig["token"];
+    String externalId = incodeStartSingleVerificationConfig["externalId"];
+
+    // hardcoding flow/configurationId for now because it doesn't matter
+    String configurationId = "629540c0362696001836915b";
+    OnboardingSessionConfiguration sessionConfiguration =
+        OnboardingSessionConfiguration(configurationId: configurationId, externalId: externalId);
+    //  OnboardingSessionConfiguration(externalId: externalId);
     String verificationType = externalId.substring(0, externalId.indexOf(SEPARATOR));
     OnboardingFlowConfiguration flowConfiguration = _createOnboardingFlowConfiguration(verificationType);
 
@@ -144,7 +171,7 @@ class _MyHomePageState extends State<MyHomePage> {
               if (sessions.isEmpty)
                 {showAlertDialog(context, "Onboarding Completed Successfully")}
               else
-                {_startOnboarding(sessions)}
+                {_startOnboardingV1(sessions)}
             },
         onError: (error) => {showAlertDialog(context, 'Onboarding Error: $error')}
     );
