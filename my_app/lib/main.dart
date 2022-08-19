@@ -163,7 +163,6 @@ class _MyHomePageState extends State<MyHomePage> {
     String configurationId = "629540c0362696001836915b";
     OnboardingSessionConfiguration sessionConfiguration =
         OnboardingSessionConfiguration(configurationId: configurationId, externalId: externalId);
-    //  OnboardingSessionConfiguration(externalId: externalId);
     String verificationType = externalId.substring(0, externalId.indexOf(SEPARATOR));
     OnboardingFlowConfiguration flowConfiguration = _createOnboardingFlowConfiguration(verificationType);
 
