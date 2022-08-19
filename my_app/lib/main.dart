@@ -107,7 +107,7 @@ class _MyHomePageState extends State<MyHomePage> {
       loggingEnabled: true,
       onSuccess: () {
         print('Incode initialize successfully!');
-        _startOnboardingV2(sessions);
+        _startOnboardingV1(sessions);
       },
       onError: (String error) {
         print('Incode SDK init failed: $error');
