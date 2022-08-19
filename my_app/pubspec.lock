@@ -120,7 +120,7 @@ packages:
     dependency: "direct main"
     description:
       path: "."
-      ref: master
+      ref: f08a7eba82646d13277acdbb3aa462b74c636348
       resolved-ref: f08a7eba82646d13277acdbb3aa462b74c636348
       url: "git@github.com:Incode-Technologies-Example-Repos/IncdOnboardingFlutter.git"
     source: git
