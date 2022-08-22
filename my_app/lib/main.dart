@@ -1,4 +1,3 @@
-import 'dart:collection';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -122,27 +121,36 @@ class _MyHomePageState extends State<MyHomePage> {
     return queryString.substring(1);
   }
 
+  /** SDK 2.0.0 **/
+  /*
   void _startOnboardingV2(Map<String, dynamic> sessions) {
     dynamic incodeStartSingleVerificationConfig = sessions.remove(sessions.keys.first);
     String interviewId = incodeStartSingleVerificationConfig["interviewId"];
     String token = incodeStartSingleVerificationConfig["token"];
     String externalId = incodeStartSingleVerificationConfig["externalId"];
 
-    // hardcoding flow/configurationId for now because it doesn't matter
+    // hardcoding flow/configurationId for now. ConfigurationId controls the finer details of the modules such as timeouts, retries
     String verificationType = externalId.substring(0, externalId.indexOf(SEPARATOR));
-    List<OnboardingValidationModule> onboardingValidationModules = _createOnboardingValidationModulesList(verificationType);
+    // This is unused because we're fine with defaults. This just determines which of the modules are taken into
+    // consideration when calculating validity of the flow
+    // List<OnboardingValidationModule> onboardingValidationModules = _createOnboardingValidationModulesList(verificationType);
+    OnboardingFlowConfiguration flowConfiguration = OnboardingFlowConfiguration();
+    flowConfiguration.addSelfieScan();
     String configurationId = "629540c0362696001836915b";
     OnboardingSessionConfiguration sessionConfiguration =
-        OnboardingSessionConfiguration(configurationId: configurationId,
-            externalId: externalId,
-            interviewId: interviewId,
-            token: token,
-            userRegion: "ALL",
-            onboardingValidationModules: onboardingValidationModules);
+        OnboardingSessionConfiguration(
+          //  configurationId: configurationId,
+          //  externalId: externalId,
+          //  interviewId: interviewId,
+          token: token,
+          //  userRegion: "ALL",
+            //onboardingValidationModules: onboardingValidationModules
+        );
     IncodeOnboardingSdk.setupOnboardingSession(sessionConfig: sessionConfiguration,
         onSuccess: (result) => {
           // simulating a webhook callback
           _postWebhook(interviewId, externalId),
+          IncodeOnboardingSdk.startNewOnboardingSection(flowConfig: flowConfiguration, onError: (error) => {showAlertDialog(context, 'Onboarding Error: $error')}),
           // start a new verification until all verifications are done
           if (sessions.isEmpty)
             {showAlertDialog(context, "Onboarding Completed Successfully")}
@@ -152,15 +160,29 @@ class _MyHomePageState extends State<MyHomePage> {
         onError: (error) => {showAlertDialog(context, 'Onboarding Error: $error')});
   }
 
-  // was implemented in SDK v1
+  Map<String, List<OnboardingValidationModule>> verificationTypeOnboardingListModulesMap = {
+    "PHOTO_ID": [OnboardingValidationModule.id],
+    "GOVT_VALIDATION": [OnboardingValidationModule.governmentValidation],
+    "LIVENESS": [OnboardingValidationModule.liveness]
+  };
+
+  List<OnboardingValidationModule> _createOnboardingValidationModulesList(String verificationType) {
+    return verificationTypeOnboardingListModulesMap[verificationType]!;
+  }
+  */
+
+  /** SDK 1.2.0 **/
   void _startOnboardingV1(Map<String, dynamic> sessions) {
     dynamic incodeStartSingleVerificationConfig = sessions.remove(sessions.keys.first);
     String interviewId = incodeStartSingleVerificationConfig["interviewId"];
     String token = incodeStartSingleVerificationConfig["token"];
     String externalId = incodeStartSingleVerificationConfig["externalId"];
 
-    // hardcoding flow/configurationId for now because it doesn't matter
+    // hardcoding flow/configurationId for now. ConfigurationId controls the finer details of the modules such as timeouts, retries
     String configurationId = "629540c0362696001836915b";
+    // This code could be used with SDK 2.0.0, because it allows us to pick everything from the token itself.
+    // Not much benefit though (that I can see)
+    //OnboardingSessionConfiguration sessionConfiguration = OnboardingSessionConfiguration(token: token);
     OnboardingSessionConfiguration sessionConfiguration =
         OnboardingSessionConfiguration(configurationId: configurationId, externalId: externalId);
     String verificationType = externalId.substring(0, externalId.indexOf(SEPARATOR));
@@ -195,23 +217,9 @@ class _MyHomePageState extends State<MyHomePage> {
     return flowConfiguration;
   }
 
-  Map<String, List<OnboardingValidationModule>> verificationTypeOnboardingListModulesMap = {
-    "PHOTO_ID": [OnboardingValidationModule.id],
-    "GOVT_VALIDATION": [OnboardingValidationModule.governmentValidation],
-    "LIVENESS": [OnboardingValidationModule.liveness]
-  };
-
-  List<OnboardingValidationModule> _createOnboardingValidationModulesList(String verificationType) {
-    return verificationTypeOnboardingListModulesMap[verificationType]!;
-  }
-
   @override
   void initState() {
     super.initState();
-  }
-
-  Future<http.Response> fetchAlbum() {
-    return http.get(Uri.parse('https://jsonplaceholder.typicode.com/albums/1'));
   }
 
   showAlertDialog(BuildContext context, String message) {
