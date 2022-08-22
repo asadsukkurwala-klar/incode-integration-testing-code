@@ -78,7 +78,10 @@ class _MyHomePageState extends State<MyHomePage> {
       "interviewId": interviewId,
       "externalId": externalId
     };
-    await http.post(Uri.parse('$backendBaseUrl/incode/webhook'), body: jsonEncode(body))
+    Map<String, String> headers = {
+      'content-type': 'application/json'
+    };
+    await http.post(Uri.parse('$backendBaseUrl/incode/webhook'), body: jsonEncode(body), headers: headers)
         .then((response) => jsonDecode(response.body));
   }
 

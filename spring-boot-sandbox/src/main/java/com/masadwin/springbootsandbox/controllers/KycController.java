@@ -99,7 +99,7 @@ public class KycController {
   private void validateOcrData(String interviewId, String userId) {
     Object user = null; // fetch from Klar DB
     Object ocrData = null; // fetch from incode API
-    boolean match = user != ocrData;
+    boolean match = user == ocrData;
     if (!match) {
       throw new RuntimeException();
     }
