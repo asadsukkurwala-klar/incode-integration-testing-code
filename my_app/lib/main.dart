@@ -198,11 +198,11 @@ class _MyHomePageState extends State<MyHomePage> {
           // simulating a webhook callback
           _postWebhook(interviewId, externalId),
           // start a new verification until all verifications are done
-              if (sessions.isEmpty)
-                {showAlertDialog(context, "Onboarding Completed Successfully")}
-              else
-                {_startOnboardingV1(sessions)}
-            },
+          if (sessions.isEmpty)
+            {showAlertDialog(context, "Onboarding Completed Successfully")}
+          else
+            {_startOnboardingV1(sessions)}
+        },
         onError: (error) => {showAlertDialog(context, 'Onboarding Error: $error')}
     );
   }
