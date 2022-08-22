@@ -12,54 +12,62 @@ participant     AWSS3      as awss3 #F5c550
 participant     Kafka      as kafka #B1b1ac
 user -> app : user begins. \nAssuming verifications have already been created,\nusing the current flow
 activate app #3399ff
-app  [#3399ff]-> ims : requestFlowStart(userId).\nHTTP POST /api/v1/...\n{"userId": userId}
+app  [#3399ff]-> kyc : fetchUserVerificationStatuses(userId)
+activate kyc #Aae283
+kyc [#green]-> app : [{verificationType, verificationStatus}...]
+deactivate kyc
+app  [#3399ff]-> ims : requestFlowStart(userId, verifications[]).\nHTTP POST /api/v1/...\n{"userId": userId, "verifications": []}
 activate ims #F7a7f5
 '@ims   [#purple]-> ims : saveFlowState(userId).
-ims [#purple]-> kyc : initVerificationProcess(externalId: userId).\nHTTP POST /api/v1/kyc/tierVerifications\n{"uuid": userId}
+ims [#purple]-> kyc : initVerificationProcess(userId).\nHTTP POST /api/v1/kyc/tierVerifications\n{"uuid": userId}
 activate kyc #Aae283
-kyc [#green]-> kyc : Create verifications/states
+kyc [#green]-> kyc : Create missing verifications/states
 kyc [#green]-> ims : HTTP 200
 deactivate kyc
-ims [#purple]-> incodeexternal : startOnboarding(externalId: userId).\nHTTP POST /omni/start\n{"uuid": userId}
-activate incodeexternal #ccccff
-incodeexternal [#cccfff]-> ims : response: {token, interviewId...}
-deactivate incodeexternal
-ims [#purple]-> app : response: {token, interviewId}
+loop # of times == verificationTypes[].count
+    ims [#purple]-> incodeexternal : startOnboarding(externalId: VERIFICATION_TYPE+":"+userId). //LIVENESS:USER_ID\nHTTP POST /omni/start\nstartOnboaridng is called equal to # of required verifications\n     each creating a separate session
+    activate incodeexternal #ccccff
+    incodeexternal [#cccfff]-> ims : response: {token, interviewId...}
+    deactivate incodeexternal
+end
+ims [#purple]-> app : response: [{token, interviewId, externalId}]\narray of sessions is returned
 deactivate ims
 deactivate app
-user <-> app : user goes through the flow
-activate user
-activate app #3399ff
-app [#3399ff]-> incodeexternal : completeOnboarding(token)
-deactivate user
-deactivate app
-activate incodeexternal #ccccff
-incodeexternal [#ccccff]-> ims : callWebhook(uniqueId).\nHTTP POST /incode-bridge/webhook/onboarding\n
-activate ims #F7a7f5
-ims [#purple]-> incodeexternal : fetchScores(token).\nHTTP GET /omni/get/score
-activate incodeexternal #ccccff
-incodeexternal [#ccccff]-> ims : {response}
-deactivate incodeexternal
-ims [#purple]-> incodeexternal : fetchOcrData(token).\nHTTP GET /omni/get/ocr-data
-activate incodeexternal #ccccff
-incodeexternal [#ccccff]-> ims : {response}
-deactivate incodeexternal
-ims [#purple]-> incodeexternal : fetchImages(token).\nHTTP GET /omni/get/images/v2
-activate incodeexternal #ccccff
-incodeexternal [#ccccff]-> ims : {response}
-deactivate incodeexternal
-ims [#purple]-> incodeexternal : closeSession(interviewId, token).\nHTTP POST /omni/session/status/set?id=<id>&action=Closed
-activate incodeexternal #ccccff
-incodeexternal [#ccccff]-> ims : HTTP 200
-deactivate incodeexternal
-deactivate incodeexternal
-ims [#purple]-> awss3 : storeImages([images])
-activate awss3 #F5c550
-deactivate awss3
-ims [#purple]-> kafka : generateEvent(VerifyIdentificationResult)
-deactivate ims
-deactivate kyc
-activate kafka #B1b1ac
-kyc <-> kafka : handleEvent(VerifyIdentificationResult)
-deactivate kafka
+loop # of times == sessions[].count
+    user <-> app : user goes through the flow\neach verification type for a use initiates a new session\nthe user does not need to realise this detail
+    activate user
+    activate app #3399ff
+    app [#3399ff]-> incodeexternal : completeOnboarding(token)
+    deactivate user
+    deactivate app
+    activate incodeexternal #ccccff
+    incodeexternal [#ccccff]-> ims : callWebhook(uniqueId).\nHTTP POST /incode-bridge/webhook/onboarding
+    activate ims #F7a7f5
+    ims [#purple]-> incodeexternal : fetchScores(token).\nHTTP GET /omni/get/score
+    activate incodeexternal #ccccff
+    incodeexternal [#ccccff]-> ims : {response}
+    deactivate incodeexternal
+    ims [#purple]-> incodeexternal : fetchOcrData(token).\nHTTP GET /omni/get/ocr-data
+    activate incodeexternal #ccccff
+    incodeexternal [#ccccff]-> ims : {response}
+    deactivate incodeexternal
+    ims [#purple]-> incodeexternal : fetchImages(token).\nHTTP GET /omni/get/images/v2
+    activate incodeexternal #ccccff
+    incodeexternal [#ccccff]-> ims : {response}
+    deactivate incodeexternal
+    ims [#purple]-> incodeexternal : closeSession(interviewId, token).\nHTTP POST /omni/session/status/set?id=<id>&action=Closed
+    activate incodeexternal #ccccff
+    incodeexternal [#ccccff]-> ims : HTTP 200
+    deactivate incodeexternal
+    deactivate incodeexternal
+    ims [#purple]-> awss3 : storeImages([images])
+    activate awss3 #F5c550
+    deactivate awss3
+    ims [#purple]-> kafka : generateEvent(VerifyIdentificationResult)
+    deactivate ims
+    deactivate kyc
+    activate kafka #B1b1ac
+    kyc <-> kafka : handleEvent(VerifyIdentificationResult)
+    deactivate kafka
+end
 @enduml
