@@ -118,6 +118,39 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  /** SDK 1.2.0 **/
+  void _startOnboardingV1(Map<String, dynamic> sessions) {
+    dynamic incodeStartSingleVerificationConfig = sessions.remove(sessions.keys.first);
+    String interviewId = incodeStartSingleVerificationConfig["interviewId"];
+    String token = incodeStartSingleVerificationConfig["token"];
+    String externalId = incodeStartSingleVerificationConfig["externalId"];
+
+    // hardcoding flow/configurationId for now. ConfigurationId controls the finer details of the modules such as timeouts, retries
+    String configurationId = "629540c0362696001836915b";
+    // This code could be used with SDK 2.0.0, because it allows us to pick everything from the token itself.
+    // Not much benefit though (that I can see)
+    //OnboardingSessionConfiguration sessionConfiguration = OnboardingSessionConfiguration(token: token);
+    OnboardingSessionConfiguration sessionConfiguration =
+    OnboardingSessionConfiguration(configurationId: configurationId, externalId: externalId);
+    String verificationType = externalId.substring(0, externalId.indexOf(SEPARATOR));
+    OnboardingFlowConfiguration flowConfiguration = _createOnboardingFlowConfiguration(verificationType);
+
+    IncodeOnboardingSdk.startOnboarding(
+        sessionConfig: sessionConfiguration,
+        flowConfig: flowConfiguration,
+        onSuccess: () => {
+          // simulating a webhook callback
+          _postWebhook(interviewId, externalId),
+          // start a new verification until all verifications are done
+          if (sessions.isEmpty)
+            {showAlertDialog(context, "Onboarding Completed Successfully")}
+          else
+            {_startOnboardingV1(sessions)}
+        },
+        onError: (error) => {showAlertDialog(context, 'Onboarding Error: $error')}
+    );
+  }
+
   void _initSdkV2() async {
     Map<String, dynamic> verificationStatuses = await getVerifications(this.getVerificationStatusesUrl, this.userId);
     // filter out verifications that have been completed
@@ -165,83 +198,61 @@ class _MyHomePageState extends State<MyHomePage> {
 
     // hardcoding flow/configurationId for now. ConfigurationId controls the finer details of the modules such as timeouts, retries
     String verificationType = externalId.substring(0, externalId.indexOf(SEPARATOR));
-    OnboardingFlowConfiguration flowConfiguration =  _createOnboardingFlowConfiguration(verificationType);
     // hardcoding flow/configurationId for now. ConfigurationId controls the finer details of the modules such as timeouts, retries
     String configurationId = "629540c0362696001836915b";
     OnboardingSessionConfiguration sessionConfiguration = OnboardingSessionConfiguration(token: token, configurationId: configurationId);
     IncodeOnboardingSdk.setupOnboardingSession(sessionConfig: sessionConfiguration,
         onSuccess: (result) => {
-          IncodeOnboardingSdk.startNewOnboardingSection(flowConfig: flowConfiguration,
-            onError: (error) => {showAlertDialog(context, 'Onboarding Error: $error')},
-            onOnboardingSectionCompleted: (resultMap) => {
-              print(resultMap.toString()),
-              // simulating a webhook callback
-              //_postWebhook(interviewId, externalId),
-              // start a new verification until all verifications are done
-              if (sessions.isEmpty)
-                {showAlertDialog(context, "Onboarding Completed Successfully")}
-              else
-                {_startOnboardingV2(sessions)}
-            },
-            onOnboardingSessionCreated: (createdParametersMap) => {
-              print(createdParametersMap.toString())
-            }),
+          _onSetupOnboardingSessionSuccess(result, verificationType, () => {_onSingleSdkModuleFinished(sessions, interviewId, externalId)})
         },
         onError: (error) => {showAlertDialog(context, 'Onboarding Error: $error')});
   }
 
-  Map<String, List<OnboardingValidationModule>> verificationTypeOnboardingListModulesMap = {
-    "PHOTO_ID": [OnboardingValidationModule.id],
-    "GOVT_VALIDATION": [OnboardingValidationModule.governmentValidation],
-    "LIVENESS": [OnboardingValidationModule.liveness]
-  };
-
-  List<OnboardingValidationModule> _createOnboardingValidationModulesList(String verificationType) {
-    return verificationTypeOnboardingListModulesMap[verificationType]!;
+  void _onSingleSdkModuleFinished(Map<String, dynamic> sessions, String interviewId, String externalId) {
+    IncodeOnboardingSdk.finishFlow(onError: (err) => {
+      showAlertDialog(context, 'finishFlow Error: $err')
+    }, onSuccess: () => {
+      print('finishFlow success'),
+      // simulating a webhook callback
+      _postWebhook(interviewId, externalId),
+      // start a new verification until all verifications are done
+      if (sessions.isEmpty)
+        {showAlertDialog(context, "Onboarding Completed Successfully")}
+      else
+        {_startOnboardingV2(sessions)}
+    });
   }
 
-  /** SDK 1.2.0 **/
-  void _startOnboardingV1(Map<String, dynamic> sessions) {
-    dynamic incodeStartSingleVerificationConfig = sessions.remove(sessions.keys.first);
-    String interviewId = incodeStartSingleVerificationConfig["interviewId"];
-    String token = incodeStartSingleVerificationConfig["token"];
-    String externalId = incodeStartSingleVerificationConfig["externalId"];
-
-    // hardcoding flow/configurationId for now. ConfigurationId controls the finer details of the modules such as timeouts, retries
-    String configurationId = "629540c0362696001836915b";
-    // This code could be used with SDK 2.0.0, because it allows us to pick everything from the token itself.
-    // Not much benefit though (that I can see)
-    //OnboardingSessionConfiguration sessionConfiguration = OnboardingSessionConfiguration(token: token);
-    OnboardingSessionConfiguration sessionConfiguration =
-        OnboardingSessionConfiguration(configurationId: configurationId, externalId: externalId);
-    String verificationType = externalId.substring(0, externalId.indexOf(SEPARATOR));
-    OnboardingFlowConfiguration flowConfiguration = _createOnboardingFlowConfiguration(verificationType);
-
-    IncodeOnboardingSdk.startOnboarding(
-        sessionConfig: sessionConfiguration,
-        flowConfig: flowConfiguration,
-        onSuccess: () => {
-          // simulating a webhook callback
-          _postWebhook(interviewId, externalId),
-          // start a new verification until all verifications are done
-          if (sessions.isEmpty)
-            {showAlertDialog(context, "Onboarding Completed Successfully")}
-          else
-            {_startOnboardingV1(sessions)}
-        },
-        onError: (error) => {showAlertDialog(context, 'Onboarding Error: $error')}
-    );
+  void _onSetupOnboardingSessionSuccess(OnboardingSessionResult onboardingSessionResult,
+      String verificationType,
+      Function() onVerificationCompleted) {
+    if (verificationType == "PHOTO_ID") {
+      OnboardingFlowConfiguration flowConfiguration = OnboardingFlowConfiguration();
+      flowConfiguration.addIdScan();
+      flowConfiguration.addProcessId();
+      IncodeOnboardingSdk.startNewOnboardingSection(flowConfig: flowConfiguration,
+          onError: (error) => {showAlertDialog(context, '_onSetupOnboardingSessionError: $error')},
+          onIdProcessed: (result) => {onVerificationCompleted()}
+      );
+    }
+    if (verificationType == "LIVENESS") {
+      OnboardingFlowConfiguration flowConfiguration = OnboardingFlowConfiguration();
+      flowConfiguration.addSelfieScan();
+      IncodeOnboardingSdk.startNewOnboardingSection(flowConfig: flowConfiguration,
+          onError: (error) => {showAlertDialog(context, '_onSetupOnboardingSessionError: $error')},
+          onSelfieScanCompleted: (result) => {onVerificationCompleted()}
+      );
+    }
   }
-
-  // add more if needed
-  Map<String, void Function(OnboardingFlowConfiguration flowConfiguration)> verificationTypeFlowConfigurer = {
-    "PHOTO_ID": (flowConfiguration) => {flowConfiguration.addIdScan(),
-      flowConfiguration.addProcessId()}, // this adds ocr
-    "GOVT_VALIDATION": (flowConfiguration) => {flowConfiguration.addGovernmentValidation()},
-    "LIVENESS": (flowConfiguration) => {flowConfiguration.addSelfieScan()}
-  };
 
   OnboardingFlowConfiguration _createOnboardingFlowConfiguration(String verificationType) {
+    // add more if needed
+    Map<String, void Function(OnboardingFlowConfiguration flowConfiguration)> verificationTypeFlowConfigurer = {
+      "PHOTO_ID": (flowConfiguration) => {flowConfiguration.addIdScan(),
+        flowConfiguration.addProcessId()}, // this adds ocr
+      "GOVT_VALIDATION": (flowConfiguration) => {flowConfiguration.addGovernmentValidation()},
+      "LIVENESS": (flowConfiguration) => {flowConfiguration.addSelfieScan()}
+    };
     OnboardingFlowConfiguration flowConfiguration = OnboardingFlowConfiguration();
     verificationTypeFlowConfigurer[verificationType]!.call(flowConfiguration);
     return flowConfiguration;
