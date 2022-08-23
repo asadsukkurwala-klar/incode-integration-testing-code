@@ -166,7 +166,9 @@ class _MyHomePageState extends State<MyHomePage> {
     // hardcoding flow/configurationId for now. ConfigurationId controls the finer details of the modules such as timeouts, retries
     String verificationType = externalId.substring(0, externalId.indexOf(SEPARATOR));
     OnboardingFlowConfiguration flowConfiguration =  _createOnboardingFlowConfiguration(verificationType);
-    OnboardingSessionConfiguration sessionConfiguration = OnboardingSessionConfiguration(token: token);
+    // hardcoding flow/configurationId for now. ConfigurationId controls the finer details of the modules such as timeouts, retries
+    String configurationId = "629540c0362696001836915b";
+    OnboardingSessionConfiguration sessionConfiguration = OnboardingSessionConfiguration(token: token, configurationId: configurationId);
     IncodeOnboardingSdk.setupOnboardingSession(sessionConfig: sessionConfiguration,
         onSuccess: (result) => {
           IncodeOnboardingSdk.startNewOnboardingSection(flowConfig: flowConfiguration,
@@ -233,7 +235,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
   // add more if needed
   Map<String, void Function(OnboardingFlowConfiguration flowConfiguration)> verificationTypeFlowConfigurer = {
-    "PHOTO_ID": (flowConfiguration) => {flowConfiguration.addIdScan()},
+    "PHOTO_ID": (flowConfiguration) => {flowConfiguration.addIdScan(),
+      flowConfiguration.addProcessId()}, // this adds ocr
     "GOVT_VALIDATION": (flowConfiguration) => {flowConfiguration.addGovernmentValidation()},
     "LIVENESS": (flowConfiguration) => {flowConfiguration.addSelfieScan()}
   };
