@@ -35,7 +35,7 @@ dependencies:
       # version 1.2.0 = f08a7eba82646d13277acdbb3aa462b74c636348
       # version 2.0.0 = ef954d2011a334c84e93858b63917b13f446f50c
       # additional you could just do master
-      ref: f08a7eba82646d13277acdbb3aa462b74c636348
+      ref: ef954d2011a334c84e93858b63917b13f446f50c
   http: ^0.13.5
 
 

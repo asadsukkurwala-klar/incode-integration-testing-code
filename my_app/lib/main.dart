@@ -118,6 +118,38 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  void _initSdkV2() async {
+    Map<String, dynamic> verificationStatuses = await getVerifications(this.getVerificationStatusesUrl, this.userId);
+    // filter out verifications that have been completed
+    Map<String, dynamic> verificationStatusesToBeDone =
+    Map.from(verificationStatuses)..removeWhere((key, value) => !DO_VERIFICATION_STATUSES.contains(value.toString()));
+    String verificationTypesQueryString = _createVerificationTypesQueryString(verificationStatusesToBeDone);
+    Map<String, dynamic> incodeConfigMap =
+    await getIncodeConfig(this.getIncodeConfigUrl + "?"
+        + 'userId=${this.userId}'
+        + '&$verificationTypesQueryString');
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(incodeConfigMap.toString()),
+    ));
+    String apiKey = incodeConfigMap["apiKey"];
+    String incodeApiUrl = incodeConfigMap["incodeApiUrl"];
+    Map<String, dynamic> sessions = incodeConfigMap["incodeStartSingleVerificationConfigMap"];
+
+    IncodeOnboardingSdk.init(
+      apiUrl: incodeApiUrl + '/0/',
+      testMode: false,
+      loggingEnabled: true,
+      onSuccess: () {
+        print('Incode initialize successfully!');
+        _startOnboardingV2(sessions);
+      },
+      onError: (String error) {
+        print('Incode SDK init failed: $error');
+        showAlertDialog(context, '$error');
+      },
+    );
+  }
+
   String _createVerificationTypesQueryString(Map<String, dynamic> verificationStatuses) {
     String queryString = "";
     verificationStatuses.forEach((key, value) {queryString += '&verificationTypes=$key';});
@@ -125,7 +157,6 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   /** SDK 2.0.0 **/
-  /*
   void _startOnboardingV2(Map<String, dynamic> sessions) {
     dynamic incodeStartSingleVerificationConfig = sessions.remove(sessions.keys.first);
     String interviewId = incodeStartSingleVerificationConfig["interviewId"];
@@ -134,33 +165,39 @@ class _MyHomePageState extends State<MyHomePage> {
 
     // hardcoding flow/configurationId for now. ConfigurationId controls the finer details of the modules such as timeouts, retries
     String verificationType = externalId.substring(0, externalId.indexOf(SEPARATOR));
-    // This is unused because we're fine with defaults. This just determines which of the modules are taken into
-    // consideration when calculating validity of the flow
-    // List<OnboardingValidationModule> onboardingValidationModules = _createOnboardingValidationModulesList(verificationType);
-    OnboardingFlowConfiguration flowConfiguration = OnboardingFlowConfiguration();
-    flowConfiguration.addSelfieScan();
-    String configurationId = "629540c0362696001836915b";
-    OnboardingSessionConfiguration sessionConfiguration =
-        OnboardingSessionConfiguration(
-          //  configurationId: configurationId,
-          //  externalId: externalId,
-          //  interviewId: interviewId,
-          token: token,
-          //  userRegion: "ALL",
-            //onboardingValidationModules: onboardingValidationModules
-        );
+    OnboardingFlowConfiguration flowConfiguration =  _createOnboardingFlowConfiguration(verificationType);
+    OnboardingSessionConfiguration sessionConfiguration = OnboardingSessionConfiguration(token: token);
+    /*
     IncodeOnboardingSdk.setupOnboardingSession(sessionConfig: sessionConfiguration,
         onSuccess: (result) => {
-          // simulating a webhook callback
-          _postWebhook(interviewId, externalId),
-          IncodeOnboardingSdk.startNewOnboardingSection(flowConfig: flowConfiguration, onError: (error) => {showAlertDialog(context, 'Onboarding Error: $error')}),
-          // start a new verification until all verifications are done
-          if (sessions.isEmpty)
-            {showAlertDialog(context, "Onboarding Completed Successfully")}
-          else
-            {_startOnboardingV2(sessions)}
+          IncodeOnboardingSdk.startNewOnboardingSection(flowConfig: flowConfiguration,
+            onError: (error) => {showAlertDialog(context, 'Onboarding Error: $error')},
+            onOnboardingSectionCompleted: (resultMap) => {
+              print(resultMap.toString()),
+              // simulating a webhook callback
+              //_postWebhook(interviewId, externalId),
+              // start a new verification until all verifications are done
+              if (sessions.isEmpty)
+                {showAlertDialog(context, "Onboarding Completed Successfully")}
+              else
+                {_startOnboardingV2(sessions)}
+            },
+            onOnboardingSessionCreated: (createdParametersMap) => {
+              print(createdParametersMap.toString())
+            }),
         },
         onError: (error) => {showAlertDialog(context, 'Onboarding Error: $error')});
+     */
+
+    IncodeOnboardingSdk.startFaceLogin(
+      faceLogin: FaceLogin(),
+      onSuccess: (FaceLoginResult result) {
+        print(result);
+      },
+      onError: (String error) {
+        print(error);
+      },
+    );
   }
 
   Map<String, List<OnboardingValidationModule>> verificationTypeOnboardingListModulesMap = {
@@ -172,7 +209,6 @@ class _MyHomePageState extends State<MyHomePage> {
   List<OnboardingValidationModule> _createOnboardingValidationModulesList(String verificationType) {
     return verificationTypeOnboardingListModulesMap[verificationType]!;
   }
-  */
 
   /** SDK 1.2.0 **/
   void _startOnboardingV1(Map<String, dynamic> sessions) {
