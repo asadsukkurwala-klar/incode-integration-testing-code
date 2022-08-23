@@ -116,7 +116,7 @@ public class KycController {
   private Map startOnboarding(String externalId) {
     String countryCode = "ALL";
     Map<String, String> body = Map.of(
-        "configurationId", incodeConfigFlowId, // useless but ok
+        "configurationId", incodeConfigFlowId,
         "externalId", externalId,
         "countryCode", countryCode
     );

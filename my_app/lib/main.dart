@@ -167,7 +167,6 @@ class _MyHomePageState extends State<MyHomePage> {
     String verificationType = externalId.substring(0, externalId.indexOf(SEPARATOR));
     OnboardingFlowConfiguration flowConfiguration =  _createOnboardingFlowConfiguration(verificationType);
     OnboardingSessionConfiguration sessionConfiguration = OnboardingSessionConfiguration(token: token);
-    /*
     IncodeOnboardingSdk.setupOnboardingSession(sessionConfig: sessionConfiguration,
         onSuccess: (result) => {
           IncodeOnboardingSdk.startNewOnboardingSection(flowConfig: flowConfiguration,
@@ -187,17 +186,6 @@ class _MyHomePageState extends State<MyHomePage> {
             }),
         },
         onError: (error) => {showAlertDialog(context, 'Onboarding Error: $error')});
-     */
-
-    IncodeOnboardingSdk.startFaceLogin(
-      faceLogin: FaceLogin(),
-      onSuccess: (FaceLoginResult result) {
-        print(result);
-      },
-      onError: (String error) {
-        print(error);
-      },
-    );
   }
 
   Map<String, List<OnboardingValidationModule>> verificationTypeOnboardingListModulesMap = {
@@ -358,7 +346,7 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _initSdk(),
+        onPressed: () => _initSdkV2(),
         tooltip: 'Init',
         child: const Icon(Icons.start),
       ), // This trailing comma makes auto-formatting nicer for build methods.
