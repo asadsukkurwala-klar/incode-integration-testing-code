@@ -4,6 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:onboarding_flutter_wrapper/onboarding_flutter_wrapper.dart';
 import 'package:http/http.dart' as http;
 
+// ignore_for_file: avoid_print
+// ignore_for_file: use_build_context_synchronously
+// ignore_for_file: unused_element
+
 void main() {
   runApp(const MyApp());
 }
@@ -59,8 +63,8 @@ class _MyHomePageState extends State<MyHomePage> {
   late String getVerificationStatusesUrl = '$backendBaseUrl/verification/status';
   late String postWebhookUrl = '$backendBaseUrl/incode/webhook';
   late String userId = "mas";
-  String SEPARATOR = ":";
-  var DO_VERIFICATION_STATUSES = ["NEEDED", "TO_BE_RETRIED"];
+  static const String separator = ":";
+  static const doVerificationStatuses = ["NEEDED", "TO_BE_RETRIED"];
 
   Future<Map<String, dynamic>> getIncodeConfig(String url) async {
     return await http.get(Uri.parse(url))
@@ -68,7 +72,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<Map<String, dynamic>> getVerifications(String url, String userId) async {
-    return await http.get(Uri.parse(url + '?userId=$userId'))
+    return await http.get(Uri.parse('$url?userId=$userId'))
         .then((response) => jsonDecode(response.body));
   }
 
@@ -86,15 +90,13 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _initSdk() async {
-    Map<String, dynamic> verificationStatuses = await getVerifications(this.getVerificationStatusesUrl, this.userId);
+    Map<String, dynamic> verificationStatuses = await getVerifications(getVerificationStatusesUrl, userId);
     // filter out verifications that have been completed
     Map<String, dynamic> verificationStatusesToBeDone =
-        Map.from(verificationStatuses)..removeWhere((key, value) => !DO_VERIFICATION_STATUSES.contains(value.toString()));
-    String verificationTypesQueryString = _createVerificationTypesQueryString(verificationStatusesToBeDone);
+        Map.from(verificationStatuses)..removeWhere((key, value) => !doVerificationStatuses.contains(value.toString()));
+    String verificationTypesQueryString = 'verificationTypes=${verificationStatusesToBeDone.keys.join("&verificationTypes=")}';
     Map<String, dynamic> incodeConfigMap =
-        await getIncodeConfig(this.getIncodeConfigUrl + "?"
-            + 'userId=${this.userId}'
-            + '&$verificationTypesQueryString');
+        await getIncodeConfig('$getIncodeConfigUrl?userId=$userId&$verificationTypesQueryString');
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(incodeConfigMap.toString()),
     ));
@@ -113,16 +115,16 @@ class _MyHomePageState extends State<MyHomePage> {
       },
       onError: (String error) {
         print('Incode SDK init failed: $error');
-        showAlertDialog(context, '$error');
+        showAlertDialog(context, 'Incode SDK init failed: $error');
       },
     );
   }
 
-  /** SDK 1.2.0 **/
+  /// SDK 1.2.0
   void _startOnboardingV1(Map<String, dynamic> sessions) {
     dynamic incodeStartSingleVerificationConfig = sessions.remove(sessions.keys.first);
     String interviewId = incodeStartSingleVerificationConfig["interviewId"];
-    String token = incodeStartSingleVerificationConfig["token"];
+    //String token = incodeStartSingleVerificationConfig["token"];
     String externalId = incodeStartSingleVerificationConfig["externalId"];
 
     // hardcoding flow/configurationId for now. ConfigurationId controls the finer details of the modules such as timeouts, retries
@@ -132,7 +134,7 @@ class _MyHomePageState extends State<MyHomePage> {
     //OnboardingSessionConfiguration sessionConfiguration = OnboardingSessionConfiguration(token: token);
     OnboardingSessionConfiguration sessionConfiguration =
     OnboardingSessionConfiguration(configurationId: configurationId, externalId: externalId);
-    String verificationType = externalId.substring(0, externalId.indexOf(SEPARATOR));
+    String verificationType = externalId.substring(0, externalId.indexOf(separator));
     OnboardingFlowConfiguration flowConfiguration = _createOnboardingFlowConfiguration(verificationType);
 
     IncodeOnboardingSdk.startOnboarding(
@@ -152,24 +154,21 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _initSdkV2() async {
-    Map<String, dynamic> verificationStatuses = await getVerifications(this.getVerificationStatusesUrl, this.userId);
+    Map<String, dynamic> verificationStatuses = await getVerifications(getVerificationStatusesUrl, userId);
     // filter out verifications that have been completed
     Map<String, dynamic> verificationStatusesToBeDone =
-    Map.from(verificationStatuses)..removeWhere((key, value) => !DO_VERIFICATION_STATUSES.contains(value.toString()));
-    String verificationTypesQueryString = _createVerificationTypesQueryString(verificationStatusesToBeDone);
+    Map.from(verificationStatuses)..removeWhere((key, value) => !doVerificationStatuses.contains(value.toString()));
+    String verificationTypesQueryString = 'verificationTypes=${verificationStatusesToBeDone.keys.join("&verificationTypes=")}';
     Map<String, dynamic> incodeConfigMap =
-    await getIncodeConfig(this.getIncodeConfigUrl + "?"
-        + 'userId=${this.userId}'
-        + '&$verificationTypesQueryString');
+    await getIncodeConfig('$getIncodeConfigUrl?userId=$userId&$verificationTypesQueryString');
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(incodeConfigMap.toString()),
     ));
-    String apiKey = incodeConfigMap["apiKey"];
     String incodeApiUrl = incodeConfigMap["incodeApiUrl"];
     Map<String, dynamic> sessions = incodeConfigMap["incodeStartSingleVerificationConfigMap"];
 
     IncodeOnboardingSdk.init(
-      apiUrl: incodeApiUrl + '/0/',
+      apiUrl: '$incodeApiUrl/0/',
       testMode: false,
       loggingEnabled: true,
       onSuccess: () {
@@ -178,18 +177,12 @@ class _MyHomePageState extends State<MyHomePage> {
       },
       onError: (String error) {
         print('Incode SDK init failed: $error');
-        showAlertDialog(context, '$error');
+        showAlertDialog(context, '_initSdkV2 Error: $error');
       },
     );
   }
 
-  String _createVerificationTypesQueryString(Map<String, dynamic> verificationStatuses) {
-    String queryString = "";
-    verificationStatuses.forEach((key, value) {queryString += '&verificationTypes=$key';});
-    return queryString.substring(1);
-  }
-
-  /** SDK 2.0.0 **/
+  /// SDK 2.0.0
   void _startOnboardingV2(Map<String, dynamic> sessions) {
     dynamic incodeStartSingleVerificationConfig = sessions.remove(sessions.keys.first);
     String interviewId = incodeStartSingleVerificationConfig["interviewId"];
@@ -197,10 +190,10 @@ class _MyHomePageState extends State<MyHomePage> {
     String externalId = incodeStartSingleVerificationConfig["externalId"];
 
     // hardcoding flow/configurationId for now. ConfigurationId controls the finer details of the modules such as timeouts, retries
-    String verificationType = externalId.substring(0, externalId.indexOf(SEPARATOR));
+    String verificationType = externalId.substring(0, externalId.indexOf(separator));
     // hardcoding flow/configurationId for now. ConfigurationId controls the finer details of the modules such as timeouts, retries
-    String configurationId = "629540c0362696001836915b";
-    OnboardingSessionConfiguration sessionConfiguration = OnboardingSessionConfiguration(token: token, configurationId: configurationId);
+    //String configurationId = "629540c0362696001836915b";
+    OnboardingSessionConfiguration sessionConfiguration = OnboardingSessionConfiguration(token: token);
     IncodeOnboardingSdk.setupOnboardingSession(sessionConfig: sessionConfiguration,
         onSuccess: (result) => {
           _onSetupOnboardingSessionSuccess(result, verificationType, () => {_onSingleSdkModuleFinished(sessions, interviewId, externalId)})
@@ -266,7 +259,7 @@ class _MyHomePageState extends State<MyHomePage> {
   showAlertDialog(BuildContext context, String message) {
     // set up the button
     Widget okButton = TextButton(
-      child: Text("OK"),
+      child: const Text("OK"),
       onPressed: () {
         Navigator.of(context).pop();
       },
@@ -274,8 +267,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
     // set up the AlertDialog
     AlertDialog alert = AlertDialog(
-      title: Text("Info"),
-      content: Text('$message'),
+      title: const Text("Info"),
+      content: Text(message),
       actions: [
         okButton,
       ],
@@ -326,26 +319,26 @@ class _MyHomePageState extends State<MyHomePage> {
               decoration: InputDecoration(
                   border: InputBorder.none,
                   labelText: 'get incode config url',
-                  hintText: this.getIncodeConfigUrl),
-              controller: TextEditingController()..text = this.getIncodeConfigUrl,
-              onChanged: (val) => {this.getIncodeConfigUrl = val},
+                  hintText: getIncodeConfigUrl),
+              controller: TextEditingController()..text = getIncodeConfigUrl,
+              onChanged: (val) => {getIncodeConfigUrl = val},
               //fetchAlbum().then((value) => null);
             ),
             TextField(
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                   border: InputBorder.none,
                   labelText: 'userId',
                   hintText: 'userId'),
-              controller: TextEditingController()..text = this.userId,
-              onChanged: (val) => {this.userId = val},
+              controller: TextEditingController()..text = userId,
+              onChanged: (val) => {userId = val},
             ),
             TextField(
               decoration: InputDecoration(
                   border: InputBorder.none,
                   labelText: 'get verification statuses url',
-                  hintText: this.getVerificationStatusesUrl),
-              controller: TextEditingController()..text = this.getVerificationStatusesUrl,
-              onChanged: (val) => {this.getVerificationStatusesUrl = val},
+                  hintText: getVerificationStatusesUrl),
+              controller: TextEditingController()..text = getVerificationStatusesUrl,
+              onChanged: (val) => {getVerificationStatusesUrl = val},
               //fetchAlbum().then((value) => null);
             ),
             /*
