@@ -86,7 +86,7 @@ class _MyHomePageState extends State<MyHomePage> {
       'content-type': 'application/json'
     };
     await http.post(Uri.parse('$backendBaseUrl/incode/webhook'), body: jsonEncode(body), headers: headers)
-        .then((response) => jsonDecode(response.body));
+        .then((response) => print('received status code: ${response.statusCode} from webhook'));
   }
 
   void _initSdk() async {
