@@ -192,8 +192,8 @@ class _MyHomePageState extends State<MyHomePage> {
     // hardcoding flow/configurationId for now. ConfigurationId controls the finer details of the modules such as timeouts, retries
     String verificationType = externalId.substring(0, externalId.indexOf(separator));
     // hardcoding flow/configurationId for now. ConfigurationId controls the finer details of the modules such as timeouts, retries
-    //String configurationId = "629540c0362696001836915b";
-    OnboardingSessionConfiguration sessionConfiguration = OnboardingSessionConfiguration(token: token);
+    String configurationId = "629540c0362696001836915b";
+    OnboardingSessionConfiguration sessionConfiguration = OnboardingSessionConfiguration(token: token, interviewId: interviewId, externalId: externalId, configurationId: configurationId);
     IncodeOnboardingSdk.setupOnboardingSession(sessionConfig: sessionConfiguration,
         onSuccess: (result) => {
           _onSetupOnboardingSessionSuccess(result, verificationType, () => {_onSingleSdkModuleFinished(sessions, interviewId, externalId)})
