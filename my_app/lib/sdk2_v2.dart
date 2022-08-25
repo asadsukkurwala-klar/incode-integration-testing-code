@@ -67,6 +67,7 @@ class SdkV2ImplementationSecondMethod  {
       OnboardingSessionResult onboardingSessionResult,
       String userId,
       List<String> verificationType) {
+    String completeStatus = "PENDING_VERIFICATION"; // Don't know what this currently means, but for IncodeImpl I'm thinking it indicates user has done their part, now we wait.
     OnboardingFlowConfiguration flowConfiguration = OnboardingFlowConfiguration();
     if (verificationType.contains("PHOTO_ID")) {
       flowConfiguration.addIdScan();
@@ -77,8 +78,8 @@ class SdkV2ImplementationSecondMethod  {
     }
     IncodeOnboardingSdk.startNewOnboardingSection(flowConfig: flowConfiguration,
         onError: (error) => {uiHelper.showAlertDialog(context, '_onSetupOnboardingSessionError: $error')},
-        onIdProcessed: (result) => {backendOperations.updateVerificationProgress(sharedVariables.backendBaseUrl, userId, "PHOTO_ID", "COMPLETE")},
-        onSelfieScanCompleted: (result) => {backendOperations.updateVerificationProgress(sharedVariables.backendBaseUrl, userId, "LIVENESS", "COMPLETE")}
+        onIdProcessed: (result) => {backendOperations.updateVerificationProgress(sharedVariables.backendBaseUrl, userId, "PHOTO_ID", completeStatus)},
+        onSelfieScanCompleted: (result) => {backendOperations.updateVerificationProgress(sharedVariables.backendBaseUrl, userId, "LIVENESS", completeStatus)}
         // ADD THE REST HERE
     );
   }
