@@ -6,19 +6,22 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.masadwin.springbootsandbox.models.IncodeOnboardingConfig;
 import com.masadwin.springbootsandbox.models.IncodeWebhookRequestModel;
+import com.masadwin.springbootsandbox.models.UpdateUserTierVerificationStatusRequestModel;
+import com.masadwin.springbootsandbox.services.UserTierVerificationStatusService;
+import com.masadwin.springbootsandbox.utils.SpringHttpHelper;
 import com.masadwin.springbootsandbox.verification.constants.VerificationStatus;
 import com.masadwin.springbootsandbox.verification.constants.VerificationType;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -39,20 +42,34 @@ public class KycController {
   @Value("${kyc.incode.config.api.url}")
   private String incodeApiUrl;
 
-  private RestTemplate restTemplate = new RestTemplate();
-  private ObjectMapper objectMapper = new ObjectMapper();
+  @Autowired
+  private UserTierVerificationStatusService userTierVerificationStatusService;
+  @Autowired
+  private SpringHttpHelper springHttpHelper;
+
+  private final RestTemplate restTemplate = new RestTemplate();
+  private final ObjectMapper objectMapper = new ObjectMapper();
 
   @GetMapping("incode/config")
   public IncodeOnboardingConfig getIncodeConfig(
       @RequestParam("userId") String userId,
-      @RequestParam("verificationTypes")  List<VerificationType> verificationTypes) {
+      @RequestParam(value = "verificationTypes", required = false)  List<VerificationType> verificationTypes) {
 
-    Map<VerificationType, IncodeOnboardingConfig.IncodeStartSingleVerificationConfig> sessions = new HashMap<>();
-    verificationTypes.stream().forEach(verificationType -> {
-      String externalId = verificationType.name() + EXTERNAL_ID_SEPARATOR + userId;
+    Map<String, IncodeOnboardingConfig.IncodeStartSingleVerificationConfig> sessions = new HashMap<>();
+    if (null != verificationTypes) {
+      // if verification types is provided, start as many sessions
+      verificationTypes.forEach(verificationType -> {
+        String externalId = verificationType.name() + EXTERNAL_ID_SEPARATOR + userId;
+        Map startOnboardingResponse = startOnboarding(externalId);
+        sessions.put(verificationType.name(), fromStartOnboardingResponse(startOnboardingResponse, externalId));
+      });
+    } else {
+      // this was added to handle a new implementation where we just use a single session and update the progress on
+      // the backend by calling APIs from the front end (as opposed to relying on webhooks)
+      String externalId = userId;
       Map startOnboardingResponse = startOnboarding(externalId);
-      sessions.put(verificationType, fromStartOnboardingResponse(startOnboardingResponse, externalId));
-    });
+      sessions.put(externalId, fromStartOnboardingResponse(startOnboardingResponse, externalId));
+    }
 
     return IncodeOnboardingConfig.builder()
         .apiKey(incodeApiKey)
@@ -63,15 +80,16 @@ public class KycController {
 
   @GetMapping("verification/status")
   public Map<VerificationType, VerificationStatus> getVerificationStatus(@RequestParam("userId") String userId) {
-    Map<VerificationType, VerificationStatus> verificationStatuses = new HashMap<>();
-    // creating a map with all verifications COMPLETE so that we don't redo all of them
-    Arrays.stream(VerificationType.values()).forEach(verificationType -> {
-      verificationStatuses.put(verificationType, VerificationStatus.COMPLETE);
-    });
-    // now set specific verifications as NEEDED for testing purposes
-    verificationStatuses.put(VerificationType.PHOTO_ID, VerificationStatus.NEEDED);
-    verificationStatuses.put(VerificationType.LIVENESS, VerificationStatus.NEEDED);
-    return verificationStatuses;
+    return userTierVerificationStatusService.getTierVerificationStatusesForUser(userId);
+  }
+
+  @PutMapping("verification/status")
+  public void updateVerificationStatus(@RequestBody UpdateUserTierVerificationStatusRequestModel updateUserTierVerificationStatusRequestModel) {
+    userTierVerificationStatusService.updateVerificationStatusForUser(
+        updateUserTierVerificationStatusRequestModel.getUserId(),
+        updateUserTierVerificationStatusRequestModel.getVerificationType(),
+        updateUserTierVerificationStatusRequestModel.getVerificationStatus()
+    );
   }
 
   @PostMapping("incode/webhook")
@@ -85,9 +103,23 @@ public class KycController {
     validateScores(interviewId);
     validateOcrData(interviewId, userId);
     fetchAndSaveDocs(interviewId, userId);
-    markVerificationAsComplete(incodeWebhookRequestModel.getVerificationType(), userId);
+    userTierVerificationStatusService.updateVerificationStatusForUser(userId, incodeWebhookRequestModel.getVerificationType(), VerificationStatus.COMPLETE);
   }
 
+  private Map startOnboarding(String externalId) {
+    String countryCode = "ALL";
+    Map<String, String> body = Map.of(
+        "configurationId", incodeConfigFlowId,
+        "externalId", externalId,
+        "countryCode", countryCode
+    );
+    HttpEntity<?> httpEntity = new HttpEntity<>(body, springHttpHelper.createHttpHeaders());
+    Map response = restTemplate.exchange(incodeApiUrl + "/omni/start", HttpMethod.POST, httpEntity, Map.class).getBody();
+    log.info("startOnboarding: received response {}", response);
+    return response;
+  }
+
+  ///// STUBS TO EXPLAIN THE FLOW //////
   private void validateScores(String interviewId) {
     // make a fetch scores api call
     boolean acceptable = true;
@@ -111,33 +143,6 @@ public class KycController {
 
   private void markVerificationAsComplete(VerificationType verificationType, String userId) {
     // handle
-  }
-
-  private Map startOnboarding(String externalId) {
-    String countryCode = "ALL";
-    Map<String, String> body = Map.of(
-        "configurationId", incodeConfigFlowId,
-        "externalId", externalId,
-        "countryCode", countryCode
-    );
-    HttpEntity<?> httpEntity = new HttpEntity<>(body, createHttpHeaders());
-    Map response = restTemplate.exchange(incodeApiUrl + "/omni/start", HttpMethod.POST, httpEntity, Map.class).getBody();
-    log.info("startOnboarding: received response {}", response);
-    return response;
-  }
-
-  private HttpHeaders createHttpHeaders(String token) {
-    HttpHeaders headers = new HttpHeaders();
-    headers.add("x-api-key", incodeApiKey);
-    headers.add("api-version", incodeApiVersion);
-    if (null != token) {
-      headers.add("x-incode-hardware-id", token);
-    }
-    return headers;
-  }
-
-  private HttpHeaders createHttpHeaders() {
-    return createHttpHeaders(null);
   }
 
   public static final String EXTERNAL_ID_SEPARATOR = ":";

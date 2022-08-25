@@ -17,7 +17,7 @@ public class IncodeOnboardingConfig {
 
   private String apiKey;
   private String incodeApiUrl;
-  private Map<VerificationType, IncodeStartSingleVerificationConfig> incodeStartSingleVerificationConfigMap;
+  private Map<String, IncodeStartSingleVerificationConfig> incodeStartSingleVerificationConfigMap;
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
   @Data
